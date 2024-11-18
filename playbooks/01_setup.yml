@@ -1,0 +1,101 @@
+
+- name: Deploy nginx and Let's Encrypt SSL certificate
+  hosts: static_website_test_1_setup
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Install Docker dependencies
+      apt:
+        name: "{{ package }}"
+        state: present
+        update_cache: yes
+      vars:
+        package:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - make
+
+    - name: Combine non-root users to a single list
+      set_fact:
+        non_root_user_names: ["{{ nginx_user }}", "{{ static_content_user }}"]
+
+    - name: Create non-root users
+      block:
+        - name: Add user
+          ansible.builtin.user:
+            name: "{{ username }}"
+            shell: "/bin/bash"
+            generate_ssh_key: yes
+            ssh_key_type: ed25519
+            ssh_key_comment: "{{ username }}@{{ inventory_hostname }}"
+            create_home: yes
+          loop: "{{ non_root_user_names }}"
+          loop_control:
+            loop_var: username
+
+        - name: Make sure that user has permissions to the their home
+          ansible.builtin.file:
+            path: "/home/{{ username }}"
+            state: directory
+            owner: "{{ username }}"
+            group: "{{ username }}"
+          loop: "{{ non_root_user_names }}"
+          loop_control:
+            loop_var: username
+
+        - name: Then copy the authorized_keys from root so you can ssh later to the user
+          copy:
+            src: "/root/.ssh/authorized_keys"
+            dest: "/home/{{ username }}/.ssh/authorized_keys"
+            owner: "{{ username }}"
+            group: "{{ username }}"
+            mode: "0600"
+            remote_src: "yes"
+          loop: "{{ non_root_user_names }}"
+          loop_control:
+            loop_var: username
+
+        - name: Ensure /srv directory exists, writable by the non root user
+          ansible.builtin.file:
+            path: "/srv"
+            state: directory
+            owner: "{{ username }}"
+            group: "{{ username }}"
+          loop: "{{ non_root_user_names }}"
+          loop_control:
+            loop_var: username
+
+    - name: Install Docker
+      block:
+        - name: Add Docker GPG key
+          apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            state: present
+
+        - name: Add Docker repository
+          apt_repository:
+            repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable
+            state: present
+
+        - name: Install Docker
+          apt:
+            name: docker-ce
+            state: present
+
+        - name: Add the non root user to docker group
+          user:
+            name: "{{ nginx_user }}"
+            groups: docker
+            append: yes
+          changed_when: false
+
+    - name: Create content directory for the static content user
+      ansible.builtin.file:
+        path: "/home/{{ static_content_user }}/static_sites"
+        state: directory
+        owner: "{{ static_content_user }}"
+        group: "{{ static_content_user }}"

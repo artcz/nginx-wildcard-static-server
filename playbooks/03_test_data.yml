@@ -1,0 +1,35 @@
+# This is to copy some seed data to check if the setup works in production
+
+- name: Make sure that nginx and https work correctly for the app
+  hosts: static_website_test_1_static_content
+
+  vars:
+    websites:
+      - name: test-branch
+        text: "This is a content from a test branch"
+        color: "#495"
+
+      - name: feature-branch
+        text: "This is from a blue feature branch"
+        color: "#459"
+
+      - name: deleted-branch
+        text: "This is from a deleted branch"
+        color: "#c43"
+
+  tasks:
+    - name: Create some test directories
+      file:
+        path: "/home/{{ ansible_user }}/static_sites/{{ item.name }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ websites }}"
+
+    - name: Create a bunch of different websites
+      ansible.builtin.template:
+        src: ../templates/index.html
+        dest: /home/{{ ansible_user }}/static_sites/{{ item.name }}/index.html
+      loop: "{{ websites }}"
+      vars:
+        text: "{{ item.text }}"
+        color: "{{ item.color }}"
