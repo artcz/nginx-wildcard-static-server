@@ -8,15 +8,10 @@
         src: ../templates/nginx.conf.j2
         dest: ./nginx.conf
 
-    - name: Create a server Makefile to manage on-server tasks
-      ansible.builtin.template:
-        src: ../templates/Makefile.j2
-        dest: ./Makefile
-
     - name: Create a server Makefile (for nginx) to manage on-server tasks
       ansible.builtin.template:
         src: ../templates/Makefile.nginx.j2
-        dest: ./Makefile.nginx
+        dest: ./Makefile
 
     - name: Set up docker-compose.yml on the remote server
       ansible.builtin.template:

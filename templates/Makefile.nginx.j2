@@ -58,6 +58,7 @@ certbot/create-staging-certificate:
 		-d "{{ domain_name }}" \
 		--rsa-key-size "{{ letsencrypt_rsa_key_size }}" \
 		--agree-tos \
+		--no-eff-email \
 		--force-renewal
 	# And then restart nginx....
 	$(COMPOSE) exec nginx nginx -s reload
@@ -66,13 +67,13 @@ certbot/create-staging-certificate:
 certbot/upgrade-to-prod:
 	# First regenerate the certificate
 	$(COMPOSE) run certbot certonly \
-		--force-renewal \
 		--dns-ovh \
 		--dns-ovh-credentials $(OVH_INI_PATH) \
 		--email "{{ letsencrypt_email }}" \
 		-d "*.{{ domain_name }}" \
 		-d "{{ domain_name }}" \
 		--rsa-key-size "{{ letsencrypt_rsa_key_size }}" \
+		--no-eff-email \
 		--agree-tos \
 		--force-renewal
 	# And then restart nginx....

@@ -1,0 +1,64 @@
+user nginx;
+worker_processes 1;
+
+error_log /var/log/nginx/error.log warn;
+pid       /var/run/nginx.pid;
+
+
+events {
+    worker_connections 1024;
+}
+
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    keepalive_timeout 65;
+    sendfile on;
+
+    # To drop all the connections that don't use the valid host name
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+
+        listen 443 ssl default_server;
+        listen [::]:443 ssl default_server;
+        http2 on;
+
+        ssl_certificate /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/{{ domain_name }}/privkey.pem;
+
+        include /etc/letsencrypt/options-ssl-nginx.conf;
+
+        server_name _;
+
+        return 444;
+    }
+
+    # Handle port 443 - terminate ssl, and proxy the app
+    server {
+        listen 443 ssl;
+        server_name "~^(?<subdomain>[a-z0-9\-]+)\.{{ domain_name | replace('.', '\.') }}$";
+
+        ssl_certificate /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/{{ domain_name }}/privkey.pem;
+
+        include /etc/letsencrypt/options-ssl-nginx.conf;
+        ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+        root /usr/share/static_sites/$subdomain;
+        index index.html;
+
+        # This is only relevant if we host staics via nginx
+        # If we use whitenoise (like in this app), it's not needed
+        location / {
+          try_files $uri $uri/ =404;
+        }
+
+        error_page 404 /404.html;
+        location = /404.html {
+          root /usr/share/nginx/html;
+        }
+    }
+}
